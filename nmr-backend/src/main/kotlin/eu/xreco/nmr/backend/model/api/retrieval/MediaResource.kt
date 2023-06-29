@@ -1,6 +1,5 @@
 package eu.xreco.nmr.backend.model.api.retrieval
 
-import eu.xreco.nmr.backend.model.cineast.MediaType
 import kotlinx.serialization.Serializable
 
 /**

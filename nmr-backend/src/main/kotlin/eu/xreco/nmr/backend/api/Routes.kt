@@ -35,6 +35,7 @@ fun Javalin.initializeRoutes(client: SimpleClient, config: Config): Javalin =  t
                     config
                 )
             }
+            ApiBuilder.get("all/{pageSize}/{page}") { all(it, client, config) }
             ApiBuilder.get("filter/{condition}/{pageSize}/{page}") { filter(it) }
         }
         path("basket") {

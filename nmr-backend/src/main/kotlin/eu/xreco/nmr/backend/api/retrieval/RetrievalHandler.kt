@@ -384,3 +384,66 @@ fun getSimilar(context: Context, client: SimpleClient, config: Config) {/* TODO 
 fun filter(context: Context) {/* TODO implement*/
     // TODO check if this is still needed
 }
+
+@OpenApi(
+    summary = "Get all objects of a collection",
+    path = "/api/retrieval/all/{pageSize}/{page}",
+    tags = [Retrieval],
+    operationId = "getAllObjects",
+    methods = [HttpMethod.GET],
+    pathParams = [
+        OpenApiParam(name = "pageSize", type = Int::class, description = "Page size of results", required = true),
+        OpenApiParam(name = "page", type = Int::class, description = "Request page of results", required = true),
+    ],
+    responses = [
+        OpenApiResponse("200", [OpenApiContent(RetrievalResult::class)]),
+        OpenApiResponse("404", [OpenApiContent(ErrorStatus::class)]),
+        OpenApiResponse("500", [OpenApiContent(ErrorStatus::class)]),
+        OpenApiResponse("503", [OpenApiContent(ErrorStatus::class)]),
+    ]
+)
+fun all(context: Context, client: SimpleClient, config: Config) {/* TODO implement*/
+    val pageSize = context.pathParam("pageSize").toInt()
+    val page = context.pathParam("page").toInt()
+    try {
+
+        /* Query and save results to list*/
+        val list = ArrayList<MediaResource>(pageSize)
+        val query = Query("${config.database.schemaName}.media_resources")
+            .select("mediaResourceId")
+            .select("type")
+            .select("title")
+            .select("description")
+            .select("uri")
+            .select("path")
+            .limit(pageSize.toLong()).skip(page * pageSize.toLong())
+
+        client.query(query).forEach { t ->
+            list.add(
+                MediaResource(
+                    t.asString("mediaResourceId")!!,
+                    getMediaType(t.asInt("type")!!),
+                    t.asString("title"),
+                    t.asString("description"),
+                    t.asString("uri")!!,
+                    t.asString("path")!!
+                )
+            )
+        }
+
+        /* Determine how many entries can be found by the query. */
+        val countQuery = Query("${config.database.schemaName}.media_resources").count()
+        val count = client.query(countQuery).use {
+            it.next().asLong(0)!!
+        }
+
+        /* Send results. */
+        context.json(LandingPageResult(page, pageSize, count, list))
+    } catch (e: StatusRuntimeException) {
+        when (e.status.code) {
+            Status.Code.NOT_FOUND -> throw ErrorStatusException(404, "The requested entity '${config.database.schemaName}.media_resources' could not be found.")
+            Status.Code.UNAVAILABLE -> throw ErrorStatusException(503, "Connection is currently not available.")
+            else -> throw ErrorStatusException(400, e.message ?: "Unknown error")
+        }
+    }
+}

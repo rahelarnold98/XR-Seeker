@@ -3,9 +3,10 @@ package eu.xreco.nmr.backend.api.media
 import eu.xreco.nmr.backend.api.Resource
 import eu.xreco.nmr.backend.config.Config
 import eu.xreco.nmr.backend.model.api.retrieval.MediaResource
+import eu.xreco.nmr.backend.model.api.retrieval.MediaType
+import eu.xreco.nmr.backend.model.api.retrieval.getMediaType
 import eu.xreco.nmr.backend.model.api.status.ErrorStatus
 import eu.xreco.nmr.backend.model.api.status.ErrorStatusException
-import eu.xreco.nmr.backend.model.cineast.MediaType
 import eu.xreco.nmr.backend.utilities.MimeTypeHelper
 import eu.xreco.nmr.backend.utilities.ThumbnailCreator
 import io.grpc.Status
@@ -114,7 +115,7 @@ fun getMetadata(context: Context, client: SimpleClient, config: Config) {
             results.add(
                 MediaResource(
                     mediaResourceId = it.asString("mediaResourceId"),
-                    type = MediaType.values()[it.asInt("type")!!],
+                    type = getMediaType(it.asInt("type")!!),
                     title = it.asString("title"),
                     description = it.asString("description"),
                     uri = it.asString("uri"),
