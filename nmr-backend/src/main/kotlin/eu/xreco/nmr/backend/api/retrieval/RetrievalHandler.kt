@@ -235,7 +235,23 @@ fun getFulltext(context: Context, client: SimpleClient, config: Config) {
             .limit(pageSize.toLong()).skip(page * pageSize.toLong())
 
         client.query(query).forEach { t ->
-            list.add(ScoredMediaItem(t.asString("mediaResourceId")!!, t.asDouble("score")!!, t.asFloat("start")!!, t.asFloat("end")!!,  t.asFloat("rep")!!))
+
+            val elementId = t.asString("mediaResourceId")!!
+            // prepare query
+            val queryType = Query("${config.database.schemaName}.media_resources").where(Compare("mediaResourceId", "=", elementId))
+                .select("type")
+
+            // execute query
+            val resultsType = client.query(queryType)
+
+            // save results as LinkedList
+            //val listType = LinkedList<MediaType>()
+            resultsType.forEach { q ->
+                //listType.add(getMediaType(q.asInt("type")!!))
+                list.add(ScoredMediaItem(elementId, getMediaType(q.asInt("type")!!), t.asDouble("score")!!, t.asFloat("start")!!, t.asFloat("end")!!,  t.asFloat("rep")!!))
+
+            }
+
         }
 
         /* Send results. */
@@ -315,7 +331,23 @@ fun getSimilar(context: Context, client: SimpleClient, config: Config) {/* TODO 
         .limit(pageSize.toLong()).skip(page * pageSize.toLong())
 
         client.query(query).forEach { t ->
-            list.add(ScoredMediaItem(t.asString("mediaResourceId")!!, t.asDouble("score")!!, t.asFloat("start")!!, t.asFloat("end")!!,  t.asFloat("rep")!!))
+
+            val elementId = t.asString("mediaResourceId")!!
+            // prepare query
+            val queryType = Query("${config.database.schemaName}.media_resources").where(Compare("mediaResourceId", "=", elementId))
+                .select("type")
+
+            // execute query
+            val resultsType = client.query(queryType)
+
+            // save results as LinkedList
+            //val listType = LinkedList<MediaType>()
+            resultsType.forEach { q ->
+                //listType.add(getMediaType(q.asInt("type")!!))
+                list.add(ScoredMediaItem(elementId, getMediaType(q.asInt("type")!!), t.asDouble("score")!!, t.asFloat("start")!!, t.asFloat("end")!!,  t.asFloat("rep")!!))
+
+            }
+
         }
 
         /* Send results. */
