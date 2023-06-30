@@ -771,6 +771,80 @@
         "security" : [ ]
       }
     },
+    "/api/retrieval/all/{pageSize}/{page}" : {
+      "get" : {
+        "tags" : [ "Retrieval" ],
+        "summary" : "Get all objects of a collection",
+        "operationId" : "getAllObjects",
+        "parameters" : [ {
+          "name" : "pageSize",
+          "in" : "path",
+          "description" : "Page size of results",
+          "required" : true,
+          "deprecated" : false,
+          "allowEmptyValue" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        }, {
+          "name" : "page",
+          "in" : "path",
+          "description" : "Request page of results",
+          "required" : true,
+          "deprecated" : false,
+          "allowEmptyValue" : false,
+          "schema" : {
+            "type" : "integer",
+            "format" : "int32"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "description" : "OK",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/RetrievalResult"
+                }
+              }
+            }
+          },
+          "404" : {
+            "description" : "Not Found",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorStatus"
+                }
+              }
+            }
+          },
+          "500" : {
+            "description" : "Server Error",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorStatus"
+                }
+              }
+            }
+          },
+          "503" : {
+            "description" : "Service Unavailable",
+            "content" : {
+              "application/json" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/ErrorStatus"
+                }
+              }
+            }
+          }
+        },
+        "deprecated" : false,
+        "security" : [ ]
+      }
+    },
     "/api/retrieval/filter/{condition}/{pageSize}/{page}" : {
       "get" : {
         "tags" : [ "Retrieval" ],
@@ -1134,11 +1208,11 @@
       "get" : {
         "tags" : [ "Retrieval" ],
         "summary" : "Get type of given element",
-        "operationId" : "getValueOfElement",
+        "operationId" : "getTypeOfElement",
         "parameters" : [ {
           "name" : "elementId",
           "in" : "path",
-          "description" : "Id of element which will be returned",
+          "description" : "Id of element to retrieve type of",
           "required" : true,
           "deprecated" : false,
           "allowEmptyValue" : false,
@@ -1257,7 +1331,7 @@
       },
       "MediaType" : {
         "type" : "string",
-        "enum" : [ "VIDEO", "IMAGES", "AUDIO" ]
+        "enum" : [ "VIDEO", "IMAGES", "AUDIO", "MODEL3D", "UNKNOWN" ]
       },
       "RetrievalResult" : {
         "type" : "object",
@@ -1291,6 +1365,9 @@
           "id" : {
             "type" : "string"
           },
+          "type" : {
+            "$ref" : "#/components/schemas/MediaType"
+          },
           "score" : {
             "type" : "number",
             "format" : "double"
@@ -1308,7 +1385,7 @@
             "format" : "float"
           }
         },
-        "required" : [ "id", "score" ]
+        "required" : [ "id", "type", "score" ]
       },
       "Text" : {
         "type" : "object",
