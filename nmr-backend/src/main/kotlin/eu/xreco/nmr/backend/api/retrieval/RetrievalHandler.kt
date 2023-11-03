@@ -1,5 +1,6 @@
 package eu.xreco.nmr.backend.api.retrieval
 
+import com.google.gson.Gson
 import eu.xreco.nmr.backend.api.Retrieval
 import eu.xreco.nmr.backend.config.Config
 import eu.xreco.nmr.backend.model.api.retrieval.*
@@ -16,6 +17,9 @@ import org.vitrivr.cottontail.client.language.basics.predicate.And
 import org.vitrivr.cottontail.client.language.basics.predicate.Compare
 import org.vitrivr.cottontail.client.language.dql.Query
 import org.vitrivr.cottontail.core.values.FloatVectorValue
+import java.io.*
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.*
 import kotlin.FloatArray
 import kotlin.Int
@@ -444,6 +448,152 @@ fun all(context: Context, client: SimpleClient, config: Config) {/* TODO impleme
             Status.Code.NOT_FOUND -> throw ErrorStatusException(404, "The requested entity '${config.database.schemaName}.media_resources' could not be found.")
             Status.Code.UNAVAILABLE -> throw ErrorStatusException(503, "Connection is currently not available.")
             else -> throw ErrorStatusException(400, e.message ?: "Unknown error")
+        }
+    }
+}
+
+@OpenApi(
+    summary = "Create an image query of an element",
+    path = "/api/retrieval/image/{pageSize}/{page}",
+    tags = [Retrieval],
+    operationId = "uploadImage",
+    methods = [HttpMethod.POST],
+    pathParams = [
+        OpenApiParam(name = "pageSize", type = Int::class, description = "Page size of results", required = true),
+        OpenApiParam(name = "page", type = Int::class, description = "Request page of results", required = true)
+    ],
+    requestBody = OpenApiRequestBody(
+        content = [OpenApiContent(type = "application/x-www-form-urlencoded")]
+    ),
+    responses = [
+        OpenApiResponse("200", [OpenApiContent(RetrievalResult::class)]),
+        OpenApiResponse("400", [OpenApiContent(ErrorStatus::class)]),
+        OpenApiResponse("500", [OpenApiContent(ErrorStatus::class)]),
+        OpenApiResponse("503", [OpenApiContent(ErrorStatus::class)]),
+    ]
+)
+fun image(context: Context, client: SimpleClient, config: Config) {/* TODO implement*/
+    val pageSize = context.pathParam("pageSize").toInt()
+    val page = context.pathParam("page").toInt()
+
+    /* Handle similarity (more-like-this) query. */
+    try {
+        val body = context.body()
+        val dataURIPrefix = "data="
+        val dataURI = body.substringAfter(dataURIPrefix)
+
+        //hardcoded backend url
+        val url = "http://localhost:8888/extract/clip_img"
+
+        // call external feature to extract vector values
+        // Create an HttpURLConnection
+        val connection = URL(url).openConnection() as HttpURLConnection
+
+        var featureList = emptyList<Float>()
+        try {
+            // Set up the connection for a POST request
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+
+            // Write the request body to the output stream
+            val outputStream: OutputStream = connection.outputStream
+            val writer = BufferedWriter(OutputStreamWriter(outputStream))
+            writer.write("data=$dataURI")
+            writer.flush()
+            writer.close()
+            outputStream.close()
+
+            // Get the response code (optional, but useful for error handling)
+            val responseCode = connection.responseCode
+            println("Response Code: $responseCode")
+
+            // Read the response as a JSON string
+            val responseJson = if (responseCode == HttpURLConnection.HTTP_OK) {
+                val inputStream = BufferedReader(InputStreamReader(connection.inputStream))
+                val response = inputStream.readLine()
+                inputStream.close()
+                response
+            } else {
+                null
+            }
+
+            featureList = if (responseJson != null) {
+                try {
+                    val gson = Gson()
+                    gson.fromJson(responseJson, List::class.java) as List<Float>
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
+
+        } catch (e: Exception) {
+            e.printStackTrace()
+            // TODO Handle exceptions as needed
+        } finally {
+            connection.disconnect()
+        }
+
+        print(featureList)
+
+        // create similarity search query
+        /* Determine how many entries can be found by the query. */
+        val countQuery = Query("${config.database.schemaName}.features_clip").count()
+        val count = client.query(countQuery).use {
+            it.next().asLong(0)!!
+        }
+        /* Issue similarity search. */
+        val list = ArrayList<ScoredMediaItem>(pageSize)
+        val query = Query("${config.database.schemaName}.features_clip").distance(
+            "feature", FloatVectorValue(featureList), Distances.EUCLIDEAN, "score"
+        ).select("mediaResourceId")
+            .select("start")
+            .select("end")
+            .select("rep")
+            .order("score", Direction.ASC)
+            .limit(pageSize.toLong()).skip(page * pageSize.toLong())
+
+        client.query(query).forEach { t ->
+
+            val elementId = t.asString("mediaResourceId")!!
+            // prepare query
+            val queryType =
+                Query("${config.database.schemaName}.media_resources").where(Compare("mediaResourceId", "=", elementId))
+                    .select("type")
+
+            // execute query
+            val resultsType = client.query(queryType)
+
+            // save results as LinkedList
+            //val listType = LinkedList<MediaType>()
+            resultsType.forEach { q ->
+                //listType.add(getMediaType(q.asInt("type")!!))
+                list.add(
+                    ScoredMediaItem(
+                        elementId,
+                        getMediaType(q.asInt("type")!!),
+                        t.asDouble("score")!!,
+                        t.asFloat("start")!!,
+                        t.asFloat("end")!!,
+                        t.asFloat("rep")!!
+                    )
+                )
+            }
+        }
+
+        /* Send results. */
+        context.json(RetrievalResult(page, pageSize, count, list))
+    } catch (e: StatusRuntimeException) {
+        when (e.status.code) {
+            Status.Code.NOT_FOUND -> throw ErrorStatusException(
+                404,
+                "The requested entity '${config.database.schemaName}.features_clip' could not be found."
+            )
+
+            Status.Code.UNAVAILABLE -> throw ErrorStatusException(503, "Database is currently not available.")
+            else -> ErrorStatusException(400, e.message ?: "Unknown error")
         }
     }
 }
